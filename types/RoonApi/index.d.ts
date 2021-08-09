@@ -17,8 +17,8 @@ export interface MooMessage {
     msg: any
     body: any
 
-    send_continue(name: string, body?: any, content_type?: any): void
-    send_complete(name: string, body?: any, content_type?: any): void
+    send_continue(name: string, body?: Record<string,any>, content_type?: any): void
+    send_complete(name: string, body?: Record<string,any>, content_type?: any): void
 }
 
 export interface RoonApiConstructor {

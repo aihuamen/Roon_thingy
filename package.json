@@ -8,11 +8,11 @@
         "chalk": "^4.1.2",
         "dotenv": "^10.0.0",
         "node-roon-api": "github:roonlabs/node-roon-api",
-        "node-roon-api-browse": "github:roonlabs/node-roon-api",
-        "node-roon-api-image": "github:roonlabs/node-roon-api",
-        "node-roon-api-settings": "github:roonlabs/node-roon-api",
-        "node-roon-api-status": "github:roonlabs/node-roon-api",
-        "node-roon-api-transport": "github:roonlabs/node-roon-api"
+        "node-roon-api-browse": "github:roonlabs/node-roon-api-browse",
+        "node-roon-api-image": "github:roonlabs/node-roon-api-image",
+        "node-roon-api-settings": "github:roonlabs/node-roon-api-settings",
+        "node-roon-api-status": "github:roonlabs/node-roon-api-status",
+        "node-roon-api-transport": "github:roonlabs/node-roon-api-transport"
     },
     "devDependencies": {
         "@types/node": "^16.4.13",

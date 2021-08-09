@@ -7,8 +7,8 @@ declare class RoonApiSettings {
 }
 
 export interface SettingOption {
-    get_settings: (cb: Function) => void
-    save_settings: (req: MooMessage, isdryrun: boolean, settings: any) => void
+    get_settings: (cb: (s: RoonSetting) => void) => void
+    save_settings: (req: MooMessage, isdryrun: boolean, settings: RoonSetting) => void
 }
 
 export interface RoonSetting {
