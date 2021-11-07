@@ -1,9 +1,10 @@
 import chalk from "chalk"
 import RoonApi, { Core } from "node-roon-api"
 import RoonApiBrowse from "node-roon-api-browse"
+import RoonApiImage, { ImageOption } from "node-roon-api-image"
 import RoonApiSettings from "node-roon-api-settings"
 import RoonApiStatus from "node-roon-api-status"
-import RoonApiTransport, { ControlType, RoonData, Zone } from "node-roon-api-transport"
+import RoonApiTransport, { RoonData, Zone, MusicStatus } from "node-roon-api-transport"
 import { promisify } from "util"
 
 export interface SettingConfig {
@@ -13,6 +14,23 @@ export interface SettingConfig {
   }
 }
 
+export interface ImageResult {
+  type: string
+  image: Buffer
+}
+
+export interface CurrentSong extends MusicStatus {
+  title: string;
+  artist: string;
+  album: string;
+}
+
+export const IMAGE_OPTION_DEFAULT: ImageOption = {
+  scale: 'fit',
+  width: 300,
+  height: 300,
+};
+
 export class RoonService {
   private static mInstance: RoonService 
   private roon: RoonApi
@@ -20,7 +38,10 @@ export class RoonService {
   private status: RoonApiStatus
   private transport?: RoonApiTransport
   private browse?: RoonApiBrowse
+  private image?: RoonApiImage
   private zones?: Zone[]
+
+  public currentSong?: CurrentSong;
 
   static getInstance() {
     if(!this.mInstance) {
@@ -43,6 +64,7 @@ export class RoonService {
         self.core = core
         self.transport = core.services.RoonApiTransport
         self.browse = core.services.RoonApiBrowse
+        self.image = core.services.RoonApiImage
 
         if(self.transport) {
           self.transport.subscribe_zones((cmd, data) => {
@@ -53,12 +75,7 @@ export class RoonService {
               )
             )
             console.log(chalk.yellow(JSON.stringify(data, null, 2)));
-            if(cmd === 'Subscribed') {
-              self.zones = data.zones!
-            }
-            if(cmd === "Changed") {
-              self.onTransportChanged(data)
-            }
+            self.onTransportChanged(cmd, data);
           });
         }
       },
@@ -97,7 +114,7 @@ export class RoonService {
     })
     
     this.roon.init_services({
-      required_services: [RoonApiTransport, RoonApiBrowse],
+      required_services: [RoonApiTransport, RoonApiBrowse, RoonApiImage],
       provided_services: [this.status, svc_settings]
     })
 
@@ -105,44 +122,55 @@ export class RoonService {
     this.roon.start_discovery()
   }
 
-  private get currentZone() {
+  public get currentZone() {
     const setting = this.roon.load_config<SettingConfig>('settings')
-    if(!setting.zone) return
+    if(!setting.zone) return null
     return this.zones!.filter(z => z.display_name === setting.zone.name)[0]
   }
 
-  private get currentOutput() {
+  public get currentOutput() {
     const setting = this.roon.load_config<SettingConfig>('settings')
     if(!setting.zone) return
     return this.zones!.flatMap(z => z.outputs).filter(o => o.display_name === setting.zone.name)[0]
   }
 
-  setStatus(status: string) {
-    this.status.set_status(status, false)
-  }
+  setStatus = (status: string) => this.status.set_status(status, false)
+  
+  play = () => this.transport!.control(this.currentZone!, 'play')
 
-  controlMusic(cmd: ControlType) {
-    this.transport!.control(this.currentZone!, cmd)
-  }
+  pause = () => this.transport!.control(this.currentZone!, 'pause')
 
-  muteMusic() {
-    this.transport!.mute(this.currentOutput!, 'mute')
-  }
+  togglePlayPause = () => this.transport!.control(this.currentZone!, 'playpause')
 
-  unmuteMusic() {
-    this.transport!.mute(this.currentOutput!, 'unmute')
-  }
+  stop = () => this.transport!.control(this.currentZone!, 'stop')
 
-  doBrowse(itemKey: string) {
-    return promisify(this.browse!.browse).bind(this.browse)({ hierarchy: 'browse', itemKey })
-  }
+  previous = () => this.transport!.control(this.currentZone!, 'previous')
 
-  doLoad() {
-    return promisify(this.browse!.load).bind(this.browse)({ hierarchy: 'browse', offset: 0, set_display_offset: 0 })
-  }
+  next = () => this.transport!.control(this.currentZone!, 'next')
+  
+  mute = () => this.transport!.mute(this.currentOutput!, 'mute')
+  
+  unmute = () => this.transport!.mute(this.currentOutput!, 'unmute')
 
+  shuffle = () => this.transport?.change_settings(this.currentOutput!, { shuffle: true });
+  
+  doBrowse = (item_key: string) => promisify(this.browse!.browse).bind(this.browse)({ hierarchy: 'browse', item_key })
+  
+  doLoad = () => promisify(this.browse!.load).bind(this.browse)({ hierarchy: 'browse', offset: 0, set_display_offset: 0 })
+
+  getImage(image_key: string, options: ImageOption = IMAGE_OPTION_DEFAULT) {
+    return new Promise<ImageResult>((resolve, reject) => {
+      this.image!.get_image(image_key, options, (err, type, image) => {
+        if(err) {
+          return reject(err)
+        }
+        resolve({type, image})
+      })
+    })
+  }
+  
   private makeLayout(setting: Record<string,any>) {
-    let l = {
+    const l = {
       values: setting,
       layout: [] as any[],
       has_error: false,
@@ -161,9 +189,30 @@ export class RoonService {
     return l;
   }
 
-  private onTransportChanged(data: RoonData) {
-    if(data.zones_seek_changed) {
-      console.log('chageddddddd', data.zones_seek_changed[0].seek_position)
+  private onTransportChanged(cmd: string, data: RoonData) {
+    if (cmd === 'Subscribed') {
+      this.zones = data.zones!;
+      const { now_playing } = this.currentZone!;
+      this.setCurrentSongFromMusicStatus(now_playing);
+    } else if (
+      cmd === 'Changed' &&
+      data.zones_seek_changed &&
+      this.currentSong
+    ) {
+      this.currentSong.seek_position = data.zones_seek_changed[0].seek_position;
+    } else if (cmd === 'Changed' && data.zones_changed) {
+      const { now_playing } = data.zones_changed[0];
+      this.setCurrentSongFromMusicStatus(now_playing);
     }
+  }
+
+  private setCurrentSongFromMusicStatus(now: MusicStatus) {
+    const { line1, line2, line3 } = now.three_line;
+    this.currentSong = {
+      ...now,
+      title: line1,
+      artist: line2,
+      album: line3,
+    };
   }
 }
