@@ -1,6 +1,9 @@
-import { Core } from "node-roon-api";
+/// <reference types="node"/>
 
-declare class RoonApiBrowse {
+declare module 'node-roon-api-browse' {
+  import { Core } from "node-roon-api";
+
+  export default class RoonApiBrowse {
     constructor(core: Core)
     /**
      * Perform a browsing operation.  Use this when the user selects an `Item`
@@ -52,9 +55,9 @@ declare class RoonApiBrowse {
      * @param {RoonApiBrowse~loadresultcallback} [cb] - Called on success or error
      */
     load(opts: LoadOption | {}, cb: LoadResultCallback): void
-}
-
-export interface BrowseOption {
+  }
+  
+  export interface BrowseOption {
     hierarchy: HierarchyType
     multi_session_key?: string
     item_key?: string
@@ -64,41 +67,41 @@ export interface BrowseOption {
     pop_levels?: number
     refresh_list?: boolean
     set_display_offset?: number
-}
-
-export interface LoadOption {
+  }
+  
+  export interface LoadOption {
     hierarchy: HierarchyType
     set_display_offset?: number
     level?: number
     offset?: number
     count?: number
     multi_session_key?: string
-}
-
-export interface BrowseResult {
+  }
+  
+  export interface BrowseResult {
     action: BrowseAction
     item?: Item
     list?: List
     message?: string
     is_error: boolean
-}
-
-export interface LoadResult {
+  }
+  
+  export interface LoadResult {
     items: Item[]
     offset: number
     list: List
 }
-
-export interface Item {
+  
+  export interface Item {
     title: string
     subtitle?: string
     image_key?: string
     item_key?: string
     hint?: string
     input_prompt?: any
-}
-
-export interface List {
+  }
+  
+  export interface List {
     title: string
     count: number
     subtitle?: string
@@ -106,11 +109,14 @@ export interface List {
     level: number
     display_offset?: number
     hint?: string
+  }
+  
+  export type HierarchyType = "browse" | "playlists" | "settings" | "internet_radio" | "albums" |"artists" | "genres" | "composers" | "search"
+  export type BrowseAction = "message" | "none" | "list" | "replace_item" | "remove_item"
+  export type BrowseResultCallback = (err: string | false, body: BrowseResult) => void
+  export type LoadResultCallback = (err: string | false, body: LoadResult) => void
 }
 
-export type HierarchyType = "browse" | "playlists" | "settings" | "internet_radio" | "albums" |"artists" | "genres" | "composers" | "search"
-export type BrowseAction = "message" | "none" | "list" | "replace_item" | "remove_item"
-export type BrowseResultCallback = (err: string | false, body: BrowseResult) => void
-export type LoadResultCallback = (err: string | false, body: LoadResult) => void
 
-export default RoonApiBrowse
+
+
